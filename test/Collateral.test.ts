@@ -120,4 +120,20 @@ describe('Collateral', () => {
       expect(e.toString()).toMatch('revert');
     }
   });
+
+  it('Non-enabled user should fail to deposit collateral.', async () => {
+    // Create and unlock new account (which by default won't be enabled?),
+    // then make a collateral deposit which should return false.
+    const newAaccountAddress: string = web3.personal.newAccount('test');
+    web3.personal.unlockAccount(newAaccountAddress, 'test');
+    const depositAmount: BigNumber = new BigNumber(100);
+
+    // Todo: Expect result to be MarketError.UserNotEnabledForContract
+    expect(
+      await market.depositCollateralAsync(collateralPoolAddress, depositAmount, {
+        from: newAaccountAddress
+        // ... not toBeFalsy
+      })
+    ).toBeFalsy();
+  });
 });

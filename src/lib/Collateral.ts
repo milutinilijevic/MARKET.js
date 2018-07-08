@@ -28,8 +28,26 @@ export async function depositCollateralAsync(
     web3,
     collateralPoolContractAddress
   );
+
+  // Ensure caller is enabled for contract
+  const caller: string = String(txParams.from);
+  // Todo: Implement isUserEnabledForContract. Currently always returns `true`.
+  const isUserEnabled = await mktTokenContract.isUserEnabledForContract(
+    collateralPoolContractAddress,
+    caller
+  );
+
+  if (!isUserEnabled) {
+    return false;
+    // return Promise.reject<Error>(new Error(MarketError.UserNotEnabledForContract));
+  }
+
   // note users must call ERC20 approve
-  await collateralPool.depositTokensForTradingTx(depositAmount).send(txParams);
+  try {
+    await collateralPool.depositTokensForTradingTx(depositAmount).send(txParams);
+  } catch (e) {
+    return false;
+  }
   return true;
 }
 
