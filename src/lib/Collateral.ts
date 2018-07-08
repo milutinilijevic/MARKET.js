@@ -3,11 +3,12 @@ import Web3 from 'web3';
 
 // Types
 import { Provider } from '@0xproject/types';
-import { ITxParams, MarketCollateralPool } from '@marketprotocol/types';
+import { ITxParams, MarketCollateralPool, MarketToken } from '@marketprotocol/types';
 
 /**
  * deposits collateral to a traders account for a given contract address.
  * @param {Provider} provider                       Web3 provider instance.
+ * @param {MarketToken} mktTokenContract            MarketToken contract
  * @param {string} collateralPoolContractAddress    address of the MarketCollateralPool
  * @param {BigNumber | number} depositAmount        amount of ERC20 collateral to deposit
  * @param {ITxParams} txParams                      transaction parameters
@@ -15,6 +16,7 @@ import { ITxParams, MarketCollateralPool } from '@marketprotocol/types';
  */
 export async function depositCollateralAsync(
   provider: Provider,
+  mktTokenContract: MarketToken,
   collateralPoolContractAddress: string,
   depositAmount: BigNumber | number,
   txParams: ITxParams = {}

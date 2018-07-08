@@ -202,6 +202,7 @@ export class Market {
   ): Promise<boolean> {
     return depositCollateralAsync(
       this._web3.currentProvider,
+      this.mktTokenContract,
       collateralPoolContractAddress,
       depositAmount,
       txParams

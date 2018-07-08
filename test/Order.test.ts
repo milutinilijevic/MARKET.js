@@ -13,7 +13,6 @@ import {
 
 import { Market, Utils } from '../src';
 import { constants } from '../src/constants';
-import { depositCollateralAsync } from '../src/lib/Collateral';
 
 import {
   createOrderHashAsync,
@@ -185,11 +184,11 @@ describe('Order', () => {
 
     await collateralToken.approveTx(collateralPoolAddress, initialCredit).send({ from: taker });
 
-    await depositCollateralAsync(web3.currentProvider, collateralPoolAddress, initialCredit, {
+    await market.depositCollateralAsync(collateralPoolAddress, initialCredit, {
       from: maker
     });
 
-    await depositCollateralAsync(web3.currentProvider, collateralPoolAddress, initialCredit, {
+    await market.depositCollateralAsync(collateralPoolAddress, initialCredit, {
       from: taker
     });
 
@@ -254,7 +253,7 @@ describe('Order', () => {
     const collateralPoolAddress = await deployedMarketContract.MARKET_COLLATERAL_POOL_ADDRESS;
     await collateralToken.approveTx(collateralPoolAddress, initialCredit).send({ from: maker });
 
-    await depositCollateralAsync(web3.currentProvider, collateralPoolAddress, initialCredit, {
+    await market.depositCollateralAsync(collateralPoolAddress, initialCredit, {
       from: maker
     });
 
@@ -316,11 +315,11 @@ describe('Order', () => {
 
     await collateralToken.approveTx(collateralPoolAddress, initialCredit).send({ from: taker });
 
-    await depositCollateralAsync(web3.currentProvider, collateralPoolAddress, initialCredit, {
+    await market.depositCollateralAsync(collateralPoolAddress, initialCredit, {
       from: maker
     });
 
-    await depositCollateralAsync(web3.currentProvider, collateralPoolAddress, initialCredit, {
+    await market.depositCollateralAsync(collateralPoolAddress, initialCredit, {
       from: taker
     });
 

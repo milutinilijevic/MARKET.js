@@ -59,7 +59,7 @@ describe('Collateral', () => {
       collateralPoolAddress
     );
 
-    await depositCollateralAsync(web3.currentProvider, collateralPoolAddress, depositAmount, {
+    await market.depositCollateralAsync(collateralPoolAddress, depositAmount, {
       from: maker
     });
 
@@ -79,7 +79,7 @@ describe('Collateral', () => {
     );
 
     const depositAmount: BigNumber = new BigNumber(100);
-    await depositCollateralAsync(web3.currentProvider, collateralPoolAddress, depositAmount, {
+    await market.depositCollateralAsync(collateralPoolAddress, depositAmount, {
       from: maker
     });
     const newUserBalance: BigNumber = await getUserAccountBalanceAsync(
@@ -93,7 +93,7 @@ describe('Collateral', () => {
   it('withdrawCollateralAsync should withdraw correct amount', async () => {
     const withdrawAmount: BigNumber = new BigNumber(10);
     const depositAmount: BigNumber = new BigNumber(100);
-    await depositCollateralAsync(web3.currentProvider, collateralPoolAddress, depositAmount, {
+    await market.depositCollateralAsync(collateralPoolAddress, depositAmount, {
       from: maker
     });
 
