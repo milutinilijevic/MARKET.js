@@ -2,7 +2,7 @@ import { BigNumber } from 'bignumber.js';
 import Web3 from 'web3';
 
 // Types
-import { ERC20, MarketContract, MARKETProtocolConfig } from '@marketprotocol/types';
+import { MarketContract, MathLib } from '@marketprotocol/types';
 
 import { Market } from '../src';
 import { constants } from '../src/constants';
@@ -13,6 +13,8 @@ import {
   settleAndCloseAsync,
   withdrawCollateralAsync
 } from '../src/lib/Collateral';
+import { MARKETProtocolConfig } from '../src/types';
+import { artifacts } from '../src/artifacts';
 
 /**
  * Collateral
@@ -50,6 +52,33 @@ describe('Collateral', () => {
       tokenBalance,
       { from: maker }
     );
+  });
+
+  it('depositCollateralAsync should fail for deposits above approved amount', async () => {
+    const approvedAmount: BigNumber = await market.erc20TokenContractWrapper.getAllowanceAsync(
+      collateralTokenAddress,
+      maker,
+      collateralPoolAddress
+    );
+    const depositAmount = approvedAmount.plus(10); // aboue approved amount
+
+    const oldBalance: BigNumber = await market.erc20TokenContractWrapper.getBalanceAsync(
+      collateralTokenAddress,
+      collateralPoolAddress
+    );
+
+    await expect(
+      depositCollateralAsync(web3.currentProvider, collateralPoolAddress, depositAmount, {
+        from: maker
+      })
+    ).rejects.toThrow();
+
+    const newBalance: BigNumber = await market.erc20TokenContractWrapper.getBalanceAsync(
+      collateralTokenAddress,
+      collateralPoolAddress
+    );
+
+    expect(newBalance).toEqual(oldBalance);
   });
 
   it('Balance after depositCollateralAsync call is correct', async () => {
@@ -135,5 +164,51 @@ describe('Collateral', () => {
         // ... not toBeFalsy
       })
     ).toBeFalsy();
+  });
+
+  it('Calculates needed collateral correctly', async () => {
+    const mathLib: MathLib = await MathLib.createAndValidate(
+      web3,
+      artifacts.MathLibArtifact.networks[constants.NETWORK_ID_TRUFFLE].address
+    );
+
+    // in these tests we can compare the calculated amounts in MARKET.js with the calculated
+    // amounts from the MathLib solidity contract.
+
+    let longQtyToExecute = new BigNumber(5);
+    let shortQtyToExecute = new BigNumber(-5);
+    let priceToExecute = (await deployedMarketContract.PRICE_FLOOR).plus(5000);
+
+    let longCalculatedCollateral = await market.calculateNeededCollateralAsync(
+      marketContractAddress,
+      longQtyToExecute,
+      priceToExecute
+    );
+
+    let solidityLongCalculatedCollateral = await mathLib.calculateNeededCollateral(
+      await deployedMarketContract.PRICE_FLOOR,
+      await deployedMarketContract.PRICE_CAP,
+      await deployedMarketContract.QTY_MULTIPLIER,
+      longQtyToExecute,
+      priceToExecute
+    );
+
+    expect(longCalculatedCollateral).toEqual(solidityLongCalculatedCollateral);
+
+    let shortCalculatedCollateral = await market.calculateNeededCollateralAsync(
+      marketContractAddress,
+      shortQtyToExecute,
+      priceToExecute
+    );
+
+    let solidityShortCalculatedCollateral = await mathLib.calculateNeededCollateral(
+      await deployedMarketContract.PRICE_FLOOR,
+      await deployedMarketContract.PRICE_CAP,
+      await deployedMarketContract.QTY_MULTIPLIER,
+      shortQtyToExecute,
+      priceToExecute
+    );
+
+    expect(shortCalculatedCollateral).toEqual(solidityShortCalculatedCollateral);
   });
 });

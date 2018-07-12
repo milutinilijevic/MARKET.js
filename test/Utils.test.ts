@@ -5,7 +5,7 @@ import FakeProvider from 'web3-fake-provider';
 // Types
 import { ECSignature } from '@marketprotocol/types';
 
-import { Utils } from '../src/';
+import { Utils, Web3Utils } from '../src/lib/Utils';
 
 /**
  * Utils

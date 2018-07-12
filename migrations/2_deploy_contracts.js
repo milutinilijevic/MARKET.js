@@ -1,29 +1,29 @@
 const MathLib = artifacts.require(
-  'market-solidity/MathLib.sol'
+  '@marketprotocol/marketprotocol/MathLib.sol'
 );
 const OrderLib = artifacts.require(
-  'market-solidity/OrderLib.sol'
+  '@marketprotocol/marketprotocol/OrderLib.sol'
 );
 const QueryTest = artifacts.require(
-  'market-solidity/OraclizeQueryTest.sol'
+  '@marketprotocol/marketprotocol/OraclizeQueryTest.sol'
 );
 const CollateralToken = artifacts.require(
-  'market-solidity/CollateralToken.sol'
+  '@marketprotocol/marketprotocol/CollateralToken.sol'
 );
 const MarketContractOraclize = artifacts.require(
-  'market-solidity/MarketContractOraclize.sol'
+  '@marketprotocol/marketprotocol/MarketContractOraclize.sol'
 );
 const MarketContractFactory = artifacts.require(
-  'market-solidity/MarketContractFactoryOraclize.sol'
+  '@marketprotocol/marketprotocol/MarketContractFactoryOraclize.sol'
 );
 const MarketCollateralPoolFactory = artifacts.require(
-  'market-solidity/MarketCollateralPoolFactory.sol'
+  '@marketprotocol/marketprotocol/MarketCollateralPoolFactory.sol'
 );
 const MarketContractRegistry = artifacts.require(
-  'market-solidity/MarketContractRegistry.sol'
+  '@marketprotocol/marketprotocol/MarketContractRegistry.sol'
 );
 const MarketToken = artifacts.require(
-  'market-solidity/MarketToken.sol'
+  '@marketprotocol/marketprotocol/MarketToken.sol'
 );
 
 module.exports = function(deployer, network) {
@@ -31,12 +31,19 @@ module.exports = function(deployer, network) {
     deployer.deploy(MathLib);
     deployer.deploy(OrderLib);
     deployer.deploy(MarketContractRegistry).then(function() {
+
       deployer.link(
         MathLib,
         QueryTest,
         MarketContractOraclize,
-        MarketContractFactory
+        MarketContractFactory,
       );
+      
+      deployer.link(
+        MathLib,
+        MarketCollateralPoolFactory
+      );
+
       deployer.link(OrderLib, MarketContractFactory, MarketContractOraclize);
       // deploy our quest test contract
       deployer.deploy(QueryTest).then(function(queryTestInstance) {

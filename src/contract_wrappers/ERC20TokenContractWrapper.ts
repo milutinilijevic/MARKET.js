@@ -2,7 +2,7 @@ import { ERC20, ITxParams } from '@marketprotocol/types';
 import * as _ from 'lodash';
 import Web3 from 'web3';
 import BigNumber from 'bignumber.js';
-
+import { assert } from '../assert';
 /**
  * Wrapper for ERC20 token contracts and functionality
  */
@@ -39,8 +39,8 @@ export class ERC20TokenContractWrapper {
    * @return {Promise<BigNumber>}   The owner's ERC20 token balance in base units.
    */
   public async getBalanceAsync(tokenAddress: string, ownerAddress: string): Promise<BigNumber> {
-    // assert.isETHAddressHex('ownerAddress', ownerAddress);
-    // assert.isETHAddressHex('tokenAddress', tokenAddress);
+    assert.isETHAddressHex('ownerAddress', ownerAddress);
+    assert.isETHAddressHex('tokenAddress', tokenAddress);
     const normalizedTokenAddress = tokenAddress.toLowerCase();
 
     const tokenContract: ERC20 = await this._getERC20TokenContractAsync(normalizedTokenAddress);
@@ -63,10 +63,10 @@ export class ERC20TokenContractWrapper {
     amountInBaseUnits: BigNumber,
     txParams: ITxParams = {}
   ): Promise<string> {
-    // assert.isETHAddressHex('spenderAddress', spenderAddress);
-    // assert.isETHAddressHex('tokenAddress', tokenAddress);
-    // await assert.isSenderAddressAsync('ownerAddress', ownerAddress, this._web3Wrapper);
-    // assert.isValidBaseUnitAmount('amountInBaseUnits', amountInBaseUnits);
+    assert.isETHAddressHex('spenderAddress', spenderAddress);
+    assert.isETHAddressHex('tokenAddress', tokenAddress);
+    await assert.isSenderAddressAsync('txParams.from', txParams.from || '', this._web3);
+    assert.isValidBaseUnitAmount('amountInBaseUnits', amountInBaseUnits);
 
     const tokenContract = await this._getERC20TokenContractAsync(tokenAddress);
     return tokenContract.approveTx(spenderAddress, amountInBaseUnits).send(txParams);
@@ -86,9 +86,10 @@ export class ERC20TokenContractWrapper {
     ownerAddress: string,
     spenderAddress: string
   ): Promise<BigNumber> {
-    // assert.isETHAddressHex('ownerAddress', ownerAddress);
-    // assert.isETHAddressHex('tokenAddress', tokenAddress);
-    // assert.isETHAddressHex('spenderAddress', spenderAddress);
+    assert.isETHAddressHex('ownerAddress', ownerAddress);
+    assert.isETHAddressHex('tokenAddress', tokenAddress);
+    assert.isETHAddressHex('spenderAddress', spenderAddress);
+    await assert.isSenderAddressAsync('ownerAddress', ownerAddress, this._web3);
 
     const tokenContract = await this._getERC20TokenContractAsync(tokenAddress);
     return tokenContract.allowance(ownerAddress, spenderAddress);

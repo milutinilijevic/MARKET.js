@@ -1,4 +1,4 @@
-import { MARKETProtocolConfig } from '@marketprotocol/types';
+import { MARKETProtocolConfig } from './types';
 
 export const constants = {
   MAX_DIGITS_IN_UNSIGNED_256_INT: 78,

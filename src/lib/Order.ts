@@ -6,6 +6,7 @@ import { Provider } from '@0xproject/types';
 import { ECSignature, Order, OrderLib, SignedOrder } from '@marketprotocol/types';
 
 import { Utils } from './Utils';
+import { assert } from '../assert';
 
 /**
  * Computes the orderHash for a supplied order.
@@ -21,6 +22,7 @@ export async function createOrderHashAsync(
 ): Promise<string> {
   // below assert statement fails due to issues with BigNumber vs Number.
   // assert.isSchemaValid('Order', order, schemas.OrderSchema);
+  assert.isETHAddressHex('orderLibAddress', orderLibAddress);
 
   const web3: Web3 = new Web3();
   web3.setProvider(provider);
@@ -76,6 +78,9 @@ export async function createSignedOrderAsync(
   remainingQty: BigNumber,
   salt: BigNumber
 ): Promise<SignedOrder> {
+  assert.isETHAddressHex('orderLibAddress', orderLibAddress);
+  assert.isETHAddressHex('contractAddress', contractAddress);
+
   const order: Order = {
     contractAddress: contractAddress,
     expirationTimestamp: expirationTimestamp, // '', makerAccount, 0, 1, 100000, 1, '', 0
@@ -128,6 +133,8 @@ export async function isValidSignatureAsync(
   signedOrder: SignedOrder,
   orderHash: string
 ): Promise<boolean> {
+  assert.isETHAddressHex('orderLibAddress', orderLibAddress);
+
   const web3: Web3 = new Web3();
   web3.setProvider(provider);
   const orderLib: OrderLib = await OrderLib.createAndValidate(web3, orderLibAddress);
@@ -153,6 +160,8 @@ export async function signOrderHashAsync(
   orderHash: string,
   signerAddress: string
 ): Promise<ECSignature> {
+  assert.isETHAddressHex('signerAddress', signerAddress);
+
   const web3: Web3 = new Web3();
   web3.setProvider(provider);
   return Utils.signMessage(web3, signerAddress, orderHash);

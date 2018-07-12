@@ -1,7 +1,7 @@
 export const AddressSchema = {
   id: '/Address',
   type: 'string',
-  pattern: '^0x[0-9a-f]{40}$'
+  pattern: '^0x[0-9a-fA-F]{40}$'
 };
 
 export const ECSignatureParameterSchema = {

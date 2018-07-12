@@ -3,7 +3,7 @@ import { RBTree } from 'bintrees';
 import * as _ from 'lodash';
 
 // Types
-import { MarketError } from '@marketprotocol/types';
+import { MarketError } from '../types';
 
 import { IntervalUtils, Utils } from '../lib/Utils';
 

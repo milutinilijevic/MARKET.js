@@ -3,7 +3,13 @@ import * as _ from 'lodash';
 import Web3 from 'web3';
 
 // Types
-import { ITxParams, MarketContract, Order, SignedOrder } from '@marketprotocol/types';
+import { ITxParams, MarketContract, MarketToken, Order, SignedOrder } from '@marketprotocol/types';
+import { MarketError } from '../types';
+import { ERC20TokenContractWrapper } from './ERC20TokenContractWrapper';
+import { getUserAccountBalanceAsync } from '../lib/Collateral';
+import { Utils } from '../lib/Utils';
+import { constants } from '../constants';
+import { createOrderHashAsync, isValidSignatureAsync } from '../lib/Order';
 
 /**
  * Wrapper for our MarketContract objects.  This wrapper exposes all needed functionality of the
@@ -83,6 +89,8 @@ export class MarketContractWrapper {
 
   /**
    * Trades an order and returns success or error.
+   * @param {MarketToken} mktTokenContract
+   * @param {string} orderLibAddress       Address of the deployed OrderLib.
    * @param   signedOrder                     An object that conforms to the SignedOrder interface. The
    *                                          signedOrder you wish to validate.
    * @param   fillQty                         The amount of the order that you wish to fill.
@@ -90,6 +98,8 @@ export class MarketContractWrapper {
    * @returns {Promise<BigNumber | number>}   The filled quantity.
    */
   public async tradeOrderAsync(
+    mktTokenContract: MarketToken,
+    orderLibAddress: string,
     signedOrder: SignedOrder,
     fillQty: BigNumber,
     txParams: ITxParams = {}
@@ -99,6 +109,123 @@ export class MarketContractWrapper {
     const marketContract: MarketContract = await this._getMarketContractAsync(
       signedOrder.contractAddress
     );
+
+    const maker = signedOrder.maker;
+    const taker = txParams.from ? txParams.from : constants.NULL_ADDRESS;
+
+    // TODO: add check to ensure marketContract is not expired!
+    if (signedOrder.taker !== constants.NULL_ADDRESS && signedOrder.taker !== taker) {
+      return Promise.reject<BigNumber | number>(new Error(MarketError.InvalidTaker));
+    }
+
+    if (signedOrder.expirationTimestamp.isLessThan(Utils.getCurrentUnixTimestampSec())) {
+      return Promise.reject<BigNumber | number>(new Error(MarketError.OrderExpired));
+    }
+
+    if (signedOrder.remainingQty.isEqualTo(new BigNumber(0))) {
+      return Promise.reject<BigNumber | number>(new Error(MarketError.OrderFilledOrCancelled));
+    }
+
+    if (signedOrder.orderQty.isPositive() !== fillQty.isPositive()) {
+      return Promise.reject<BigNumber | number>(new Error(MarketError.BuySellMismatch));
+    }
+
+    const orderHash = await createOrderHashAsync(
+      this._web3.currentProvider,
+      orderLibAddress,
+      signedOrder
+    );
+
+    const validSignature = await isValidSignatureAsync(
+      this._web3.currentProvider,
+      orderLibAddress,
+      signedOrder,
+      orderHash
+    );
+
+    if (!validSignature) {
+      return Promise.reject<BigNumber | number>(new Error(MarketError.InvalidSignature));
+    }
+
+    const collateralPoolContractAddress = await marketContract.MARKET_COLLATERAL_POOL_ADDRESS;
+    const isMakerEnabled = await mktTokenContract.isUserEnabledForContract(
+      signedOrder.contractAddress,
+      maker
+    );
+    const isTakerEnabled = await mktTokenContract.isUserEnabledForContract(
+      signedOrder.contractAddress,
+      taker
+    );
+
+    if (!isMakerEnabled || !isTakerEnabled) {
+      return Promise.reject<BigNumber | number>(new Error(MarketError.UserNotEnabledForContract));
+    }
+
+    const erc20ContractWrapper: ERC20TokenContractWrapper = new ERC20TokenContractWrapper(
+      this._web3
+    );
+
+    // TODO: we need to add a check to ensure that not only do they have the needed balance,
+    // but that also they have given the approval for us to transfer it as well.
+
+    const makerMktBalance: BigNumber = new BigNumber(
+      await erc20ContractWrapper.getBalanceAsync(mktTokenContract.address, maker)
+    );
+    const takerMktBalance: BigNumber = new BigNumber(
+      await erc20ContractWrapper.getBalanceAsync(mktTokenContract.address, taker)
+    );
+
+    if (makerMktBalance.isLessThan(signedOrder.makerFee)) {
+      return Promise.reject<BigNumber | number>(
+        new Error(MarketError.InsufficientBalanceForTransfer)
+      );
+    }
+
+    if (takerMktBalance.isLessThan(signedOrder.takerFee)) {
+      return Promise.reject<BigNumber | number>(
+        new Error(MarketError.InsufficientBalanceForTransfer)
+      );
+    }
+
+    const makerCollateralBalance: BigNumber = new BigNumber(
+      await getUserAccountBalanceAsync(
+        this._web3.currentProvider,
+        collateralPoolContractAddress,
+        maker
+      )
+    );
+    const takerCollateralBalance: BigNumber = new BigNumber(
+      await getUserAccountBalanceAsync(
+        this._web3.currentProvider,
+        collateralPoolContractAddress,
+        taker
+      )
+    );
+
+    const neededCollateralMaker: BigNumber = await this.calculateNeededCollateralAsync(
+      signedOrder.contractAddress,
+      fillQty,
+      signedOrder.price
+    );
+
+    const neededCollateralTaker: BigNumber = await this.calculateNeededCollateralAsync(
+      signedOrder.contractAddress,
+      fillQty.times(-1), // opposite direction of the order sign! If i fill a buy order, I am selling / short.
+      signedOrder.price
+    );
+
+    if (makerCollateralBalance.isLessThan(neededCollateralMaker)) {
+      return Promise.reject<BigNumber | number>(
+        new Error(MarketError.InsufficientCollateralBalance)
+      );
+    }
+
+    if (takerCollateralBalance.isLessThan(neededCollateralTaker)) {
+      return Promise.reject<BigNumber | number>(
+        new Error(MarketError.InsufficientCollateralBalance)
+      );
+    }
+
     const txHash: string = await marketContract
       .tradeOrderTx(
         // orderAddresses
@@ -161,6 +288,18 @@ export class MarketContractWrapper {
   /**
    * Gets the collateral pool contract address
    * @param {string} marketContractAddress    Address of the Market contract.
+   * @returns {Promise<string>}               The contract's name
+   */
+  public async getMarketContractNameAsync(marketContractAddress: string): Promise<string> {
+    const marketContract: MarketContract = await this._getMarketContractAsync(
+      marketContractAddress
+    );
+    return marketContract.CONTRACT_NAME;
+  }
+
+  /**
+   * Gets the contract name
+   * @param {string} marketContractAddress    Address of the Market contract.
    * @returns {Promise<string>}               The collateral pool contract address.
    */
   public async getCollateralPoolContractAddressAsync(
@@ -170,6 +309,33 @@ export class MarketContractWrapper {
       marketContractAddress
     );
     return marketContract.MARKET_COLLATERAL_POOL_ADDRESS;
+  }
+
+  /**
+   * Calculates the required collateral amount in base units of a token.  This amount represents
+   * a trader's maximum loss and therefore the amount of collateral that becomes locked into
+   * the smart contracts upon execution of a trade.
+   * @param {string} marketContractAddress
+   * @param {BigNumber} qty             desired qty to trade (+ for buy / - for sell)
+   * @param {BigNumber} price           execution price
+   * @return {Promise<BigNumber>}       amount of needed collateral to become locked.
+   */
+  public async calculateNeededCollateralAsync(
+    marketContractAddress: string,
+    qty: BigNumber,
+    price: BigNumber
+  ): Promise<BigNumber> {
+    const marketContract: MarketContract = await this._getMarketContractAsync(
+      marketContractAddress
+    );
+
+    return Utils.calculateNeededCollateral(
+      await marketContract.PRICE_FLOOR,
+      await marketContract.PRICE_CAP,
+      await marketContract.QTY_MULTIPLIER,
+      qty,
+      price
+    );
   }
   // endregion //Public Methods
 

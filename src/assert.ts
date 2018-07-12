@@ -1,5 +1,8 @@
 import { Schema } from 'jsonschema';
 import * as _ from 'lodash';
+import { BigNumber } from 'bignumber.js';
+import Web3 from 'web3';
+import util from 'util';
 
 import { Provider } from '@0xproject/types';
 
@@ -19,6 +22,12 @@ export const assert = {
   },
   isNumber(variableName: string, value: number): void {
     this.assert(_.isFinite(value), this.typeAssertionMessage(variableName, 'number', value));
+  },
+  isBigNumber(variableName: string, value: BigNumber): void {
+    this.assert(
+      BigNumber.isBigNumber(value),
+      this.typeAssertionMessage(variableName, 'BigNumber', value)
+    );
   },
   isSchemaValid(variableName: string, value: {}, schema: Schema, subSchemas?: Schema[]): void {
     const schemaValidator = new SchemaValidator();
@@ -41,5 +50,40 @@ export const assert = {
   },
   typeAssertionMessage(variableName: string, type: string, value: {}): string {
     return `Expected ${variableName} to be of type ${type}, encountered: ${value}`;
+  },
+  isETHAddressHex(variableName: string, address: string): void {
+    const isValidAddress = /^(0x){1}[0-9a-fA-F]{40}$/i.test(address);
+    const message = `Expected ${variableName} to be an ETHAddressHex, encountered ${address}`;
+    this.assert(isValidAddress, message);
+  },
+  isValidBaseUnitAmount(variableName: string, value: BigNumber) {
+    const isNotNegative = !value.isNegative();
+    this.assert(
+      isNotNegative,
+      `${variableName} cannot be a negative number, found value: ${value.toNumber()}`
+    );
+
+    const notHaveDecimal = value.decimalPlaces() === 0;
+    this.assert(
+      notHaveDecimal,
+      `${variableName} should be in baseUnits (no decimals), found value: ${value.toNumber()}`
+    );
+  },
+  /**
+   * Ensures that the senderAddress is valid and reachable Account
+   *
+   * @param {string} variableName
+   * @param {string} senderAddress
+   * @param {Provider} provider
+   */
+  async isSenderAddressAsync(variableName: string, senderAddress: string, web3: Web3) {
+    this.isETHAddressHex(variableName, senderAddress);
+
+    const accounts = await util.promisify(web3.eth.getAccounts)();
+    const isSenderAddressAvailable = _.includes(accounts, senderAddress);
+    this.assert(
+      isSenderAddressAvailable,
+      `Specified ${variableName} ${senderAddress} isn't available through the supplied web3 provider`
+    );
   }
 };

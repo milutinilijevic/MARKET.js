@@ -65,6 +65,43 @@ export const Utils = {
     const randomNumber = BigNumber.random(constants.MAX_DIGITS_IN_UNSIGNED_256_INT);
     const factor = new BigNumber(10).pow(constants.MAX_DIGITS_IN_UNSIGNED_256_INT - 1);
     return randomNumber.times(factor);
+  },
+
+  /**
+   * Calculates the required collateral amount in base units of a token.  This amount represents
+   * a trader's maximum loss and therefore the amount of collateral that becomes locked into
+   * the smart contracts upon execution of a trade.
+   * @param {BigNumber} priceFloor      PRICE_FLOOR for the given MarketContract
+   * @param {BigNumber} priceCap        PRICE_CAP for the given MarketContract
+   * @param {BigNumber} qtyMultiplier   QTY_MULTIPLIER for the given MarketContract
+   * @param {BigNumber} qty             desired qty to trade (+ for buy / - for sell)
+   * @param {BigNumber} price           execution price
+   * @return {Promise<BigNumber>}       amount of needed collateral to become locked.
+   */
+  calculateNeededCollateral(
+    priceFloor: BigNumber,
+    priceCap: BigNumber,
+    qtyMultiplier: BigNumber,
+    qty: BigNumber,
+    price: BigNumber
+  ): BigNumber {
+    let maxLoss: BigNumber;
+    if (qty.isPositive()) {
+      // this qty is long, calculate max loss from entry price to floor
+      if (price.lte(priceFloor)) {
+        maxLoss = new BigNumber(0);
+      } else {
+        maxLoss = price.minus(priceFloor);
+      }
+    } else {
+      // this qty is short, calculate max loss from entry price to ceiling;
+      if (price.gte(priceCap)) {
+        maxLoss = new BigNumber(0);
+      } else {
+        maxLoss = priceCap.minus(price);
+      }
+    }
+    return maxLoss.times(qty.absoluteValue()).times(qtyMultiplier);
   }
 };
 

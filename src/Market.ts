@@ -7,13 +7,15 @@ import {
   ECSignature,
   ITxParams,
   MarketCollateralPoolFactory,
+  MarketContract,
   MarketContractFactoryOraclize,
   MarketContractRegistry,
-  MARKETProtocolConfig,
   MarketToken,
   Order,
+  OrderLib,
   SignedOrder
 } from '@marketprotocol/types';
+import { MARKETProtocolConfig } from './types';
 
 import { artifacts } from './artifacts';
 import { assert } from './assert';
@@ -39,6 +41,8 @@ import {
   isValidSignatureAsync,
   signOrderHashAsync
 } from './lib/Order';
+import { Utils } from './lib/Utils';
+import { MathLib } from '@marketprotocol/types/dist/types/MathLib';
 
 /**
  * The `Market` class is the single entry-point into the MARKET.js library.
@@ -54,6 +58,7 @@ export class Market {
   public mktTokenContract: MarketToken;
   public marketCollateralPoolFactory: MarketCollateralPoolFactory;
   public marketContractFactory: MarketContractFactoryOraclize; // todo: create interface.
+  public orderLib: OrderLib;
 
   // wrappers
   public marketContractWrapper: MarketContractOraclizeWrapper;
@@ -107,6 +112,11 @@ export class Market {
         : constants.NULL_ADDRESS
     );
 
+    this.orderLib = new OrderLib(
+      this._web3,
+      config.orderLibAddress ? config.orderLibAddress : constants.NULL_ADDRESS
+    );
+
     this.erc20TokenContractWrapper = new ERC20TokenContractWrapper(this._web3);
     this.marketContractWrapper = new MarketContractOraclizeWrapper(this._web3);
   }
@@ -156,6 +166,14 @@ export class Market {
     ) {
       config.marketCollateralPoolFactoryAddress =
         artifacts.MarketCollateralPoolFactoryArtifact.networks[config.networkId].address;
+    }
+
+    if (
+      !config.orderLibAddress &&
+      artifacts.OrderLibArtifact &&
+      artifacts.OrderLibArtifact.networks[config.networkId]
+    ) {
+      config.orderLibAddress = artifacts.OrderLibArtifact.networks[config.networkId].address;
     }
 
     return config;
@@ -264,12 +282,21 @@ export class Market {
   /**
    * Gets the collateral pool contract address
    * @param {string} marketContractAddress    Address of the Market contract
-   * @returns {Promise<string>}               The user's currently unallocated token balance
+   * @returns {Promise<string>}               The contract's collateral pool address
    */
   public async getCollateralPoolContractAddressAsync(
     marketContractAddress: string
   ): Promise<string> {
     return this.marketContractWrapper.getCollateralPoolContractAddressAsync(marketContractAddress);
+  }
+
+  /**
+   * Gets the market contract name
+   * @param {string} marketContractAddress    Address of the Market contract
+   * @returns {Promise<string>}               The contract's name
+   */
+  public async getMarketContractNameAsync(marketContractAddress: string): Promise<string> {
+    return this.marketContractWrapper.getMarketContractNameAsync(marketContractAddress);
   }
 
   /**
@@ -358,19 +385,17 @@ export class Market {
 
   /**
    * Confirms a signed order is validly signed
-   * @param orderLibAddress
    * @param signedOrder
    * @param orderHash
    * @return boolean if order hash and signature resolve to maker address (signer)
    */
   public async isValidSignatureAsync(
-    orderLibAddress: string,
     signedOrder: SignedOrder,
     orderHash: string
   ): Promise<boolean> {
     return isValidSignatureAsync(
       this._web3.currentProvider,
-      orderLibAddress,
+      this.orderLib.address,
       signedOrder,
       orderHash
     );
@@ -448,7 +473,13 @@ export class Market {
     fillQty: BigNumber,
     txParams: ITxParams = {}
   ): Promise<BigNumber | number> {
-    return this.marketContractWrapper.tradeOrderAsync(signedOrder, fillQty, txParams);
+    return this.marketContractWrapper.tradeOrderAsync(
+      this.mktTokenContract,
+      this.orderLib.address,
+      signedOrder,
+      fillQty,
+      txParams
+    );
   }
 
   /**
@@ -482,5 +513,25 @@ export class Market {
     return this.marketContractWrapper.cancelOrderAsync(order, cancelQty, txParams);
   }
 
+  /**
+   * Calculates the required collateral amount in base units of a token.  This amount represents
+   * a trader's maximum loss and therefore the amount of collateral that becomes locked into
+   * the smart contracts upon execution of a trade.
+   * @param {string} marketContractAddress
+   * @param {BigNumber} qty             desired qty to trade (+ for buy / - for sell)
+   * @param {BigNumber} price           execution price
+   * @return {Promise<BigNumber>}       amount of needed collateral to become locked.
+   */
+  public async calculateNeededCollateralAsync(
+    marketContractAddress: string,
+    qty: BigNumber,
+    price: BigNumber
+  ): Promise<BigNumber> {
+    return this.marketContractWrapper.calculateNeededCollateralAsync(
+      marketContractAddress,
+      qty,
+      price
+    );
+  }
   // endregion //Public Methods
 }

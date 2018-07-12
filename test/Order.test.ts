@@ -42,6 +42,121 @@ describe('Order', () => {
     contractAddress = contractAddresses[0];
   });
 
+  describe('createSignedOrderAsync', () => {
+    it('should throw error if orderLibAddress is invalid eth address', async () => {
+      const invalidOrderLibAddress = 'Invalid eth address';
+      const contractAddresses: string[] = await market.marketContractRegistry.getAddressWhiteList;
+      const marketContractAddress = contractAddresses[0];
+
+      const expirationTimeStamp: BigNumber = new BigNumber(Math.floor(Date.now() / 1000) + 60 * 60);
+      const makerAccount = web3.eth.accounts[1];
+      const takerAccount = web3.eth.accounts[2];
+
+      const fees: BigNumber = new BigNumber(0);
+      const orderQty: BigNumber = new BigNumber(100);
+      const price: BigNumber = new BigNumber(100000);
+
+      await expect(
+        createSignedOrderAsync(
+          web3.currentProvider,
+          invalidOrderLibAddress,
+          marketContractAddress,
+          expirationTimeStamp,
+          constants.NULL_ADDRESS,
+          makerAccount,
+          fees,
+          constants.NULL_ADDRESS,
+          fees,
+          orderQty,
+          price,
+          orderQty,
+          Utils.generatePseudoRandomSalt()
+        )
+      ).rejects.toThrow(Error);
+    });
+
+    it('should throw error if contractAddress is invalid eth address', async () => {
+      const contractAddresses: string[] = await market.marketContractRegistry.getAddressWhiteList;
+      const invalidContractAddress = '000000';
+
+      const expirationTimeStamp: BigNumber = new BigNumber(Math.floor(Date.now() / 1000) + 60 * 60);
+      const makerAccount = web3.eth.accounts[1];
+      const takerAccount = web3.eth.accounts[2];
+
+      const fees: BigNumber = new BigNumber(0);
+      const orderQty: BigNumber = new BigNumber(100);
+      const price: BigNumber = new BigNumber(100000);
+
+      await expect(
+        createSignedOrderAsync(
+          web3.currentProvider,
+          orderLibAddress,
+          invalidContractAddress,
+          expirationTimeStamp,
+          constants.NULL_ADDRESS,
+          makerAccount,
+          fees,
+          constants.NULL_ADDRESS,
+          fees,
+          orderQty,
+          price,
+          orderQty,
+          Utils.generatePseudoRandomSalt()
+        )
+      ).rejects.toThrow(Error);
+    });
+  });
+
+  describe('isValidSignatureAsync', () => {
+    it('should throw error if orderLibAddress is invalid eth address', async () => {
+      const contractAddresses: string[] = await market.marketContractRegistry.getAddressWhiteList;
+      const marketContractAddress = contractAddresses[0];
+
+      const expirationTimeStamp: BigNumber = new BigNumber(Math.floor(Date.now() / 1000) + 60 * 60);
+      const makerAccount = web3.eth.accounts[1];
+      const takerAccount = web3.eth.accounts[2];
+
+      const fees: BigNumber = new BigNumber(0);
+      const orderQty: BigNumber = new BigNumber(100);
+      const price: BigNumber = new BigNumber(100000);
+
+      const signedOrder: SignedOrder = await createSignedOrderAsync(
+        web3.currentProvider,
+        orderLibAddress,
+        marketContractAddress,
+        expirationTimeStamp,
+        constants.NULL_ADDRESS,
+        makerAccount,
+        fees,
+        constants.NULL_ADDRESS,
+        fees,
+        orderQty,
+        price,
+        orderQty,
+        Utils.generatePseudoRandomSalt()
+      );
+      const orderHash: string | BigNumber = await createOrderHashAsync(
+        web3.currentProvider,
+        orderLibAddress,
+        signedOrder
+      );
+      const invalidOrderLibAddress = '000';
+
+      expect(
+        isValidSignatureAsync(web3.currentProvider, invalidOrderLibAddress, signedOrder, orderHash)
+      ).rejects.toThrow(Error);
+    });
+  });
+
+  describe('signOrderHashAsync', () => {
+    it('should throw error if signerAddress is invalid eth address', () => {
+      const invalidSignerAddress = '0xabcdef';
+      expect(signOrderHashAsync(web3.currentProvider, '', invalidSignerAddress)).rejects.toThrow(
+        Error
+      );
+    });
+  });
+
   it('Signs an order', async () => {
     const contractAddresses: string[] = await market.marketContractRegistry.getAddressWhiteList;
     const marketContractAddress = contractAddresses[0];
